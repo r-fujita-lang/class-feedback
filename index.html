@@ -16,6 +16,7 @@
 <body class="bg-slate-50 min-h-screen pb-20">
     <div class="max-w-md mx-auto p-4">
         
+        <!-- 管理用タブ（生徒モードでは隠れる） -->
         <div id="tabContainer" class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl shadow-sm overflow-hidden">
             <button onclick="switchTab('user')" id="tab-user" class="tab-btn active relative flex-1 py-4 font-bold text-blue-600 text-sm">回答する</button>
             <button onclick="switchTab('admin')" id="tab-admin" class="tab-btn relative flex-1 py-4 font-bold text-slate-500 text-sm">管理画面</button>
@@ -26,15 +27,15 @@
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold text-slate-800 mb-6 text-center text-blue-700">授業の振り返り</h2>
                 <div class="grid grid-cols-3 gap-3 mb-6">
-                    <button onclick="selectRating(3)" id="rate-3" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50">
+                    <button onclick="selectRating(3)" id="rate-3" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50 transition-all">
                         <div class="text-3xl mb-1">😊</div>
                         <div class="text-[10px] font-bold">バッチリ</div>
                     </button>
-                    <button onclick="selectRating(2)" id="rate-2" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50">
+                    <button onclick="selectRating(2)" id="rate-2" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50 transition-all">
                         <div class="text-3xl mb-1">😐</div>
                         <div class="text-[10px] font-bold">まあまあ</div>
                     </button>
-                    <button onclick="selectRating(1)" id="rate-1" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50">
+                    <button onclick="selectRating(1)" id="rate-1" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50 transition-all">
                         <div class="text-3xl mb-1">😕</div>
                         <div class="text-[10px] font-bold">不安</div>
                     </button>
@@ -54,12 +55,10 @@
                 <button onclick="showQrModal()" class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xl">📱</button>
             </div>
 
-            <!-- AI連携セクション -->
             <div class="bg-indigo-600 p-5 rounded-2xl shadow-lg text-white">
-                <h3 class="font-bold flex items-center gap-2 text-sm mb-3">✨ 外部AIで分析する</h3>
-                <p class="text-[10px] mb-4 opacity-90">回答テキストをコピーして、ChatGPT等に貼り付けるだけで分析できます。</p>
+                <h3 class="font-bold flex items-center gap-2 text-sm mb-2">✨ AI分析用にコピー</h3>
                 <button onclick="copyForAI()" class="w-full bg-white text-indigo-700 font-bold py-2 rounded-lg text-xs hover:bg-indigo-50 active:scale-95 transition-all">
-                    分析用テキストをコピー
+                    回答をコピーしてChatGPTを開く
                 </button>
             </div>
 
@@ -81,7 +80,6 @@
                 <div id="qrcode" class="flex justify-center mb-6 p-2 bg-white border border-slate-100 rounded-2xl"></div>
                 <p class="text-[11px] text-slate-500 font-bold mb-4">生徒はこのQRを読み取ってください</p>
                 
-                <!-- 復活したコピーボタン -->
                 <button onclick="copyStudentUrl()" class="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 border border-blue-100">
                     <span>🔗 生徒用URLをコピー</span>
                 </button>
@@ -95,6 +93,16 @@
         let selectedRate = 0;
         let chartInstance = null;
         let responses = JSON.parse(localStorage.getItem('class_feedback_v3') || '[]');
+
+        // ページ読み込み時のチェック
+        window.onload = () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('mode') === 'user') {
+                document.getElementById('tabContainer').style.display = 'none';
+                switchTab('user');
+            }
+            refreshAdminUI();
+        };
 
         function switchTab(tab) {
             document.getElementById('view-user').classList.toggle('hidden', tab !== 'user');
@@ -164,16 +172,20 @@
             if (responses.length === 0) return showMsg("回答がありません");
             const text = responses.map(r => `【評価:${r.rate}】${r.comment}`).join('\n');
             const prompt = `以下の授業振り返りデータを分析し、1.全体の傾向、2.つまずきポイント、3.次回へのアドバイスを簡潔にまとめてください。\n\n${text}`;
-            copyToClipboard(prompt, "コピーしました！AIに貼り付けてください");
-            if(confirm("分析用テキストをコピーしました。ChatGPTを開きますか？")) {
+            copyToClipboard(prompt, "分析テキストをコピーしました！");
+            if(confirm("ChatGPTを開きますか？")) {
                 window.open("https://chatgpt.com/", "_blank");
             }
         }
 
+        // --- ここが修正ポイント ---
         function copyStudentUrl() {
-            const url = new URL(window.location.href);
-            url.searchParams.set('mode', 'user');
-            copyToClipboard(url.toString(), "生徒用URLをコピーしました！");
+            // 今のURL（ファイルパスまで）を取得
+            const currentUrl = window.location.origin + window.location.pathname;
+            // 末尾に生徒用パラメータを確実に付与
+            const studentUrl = currentUrl + "?mode=user";
+            
+            copyToClipboard(studentUrl, "生徒用URLをコピーしました！");
         }
 
         function copyToClipboard(text, msg) {
@@ -189,23 +201,20 @@
         function clearData() { if (confirm("全消去しますか？")) { responses = []; localStorage.removeItem('class_feedback_v3'); refreshAdminUI(); } }
         
         function showQrModal() {
-            const url = new URL(window.location.href); 
-            url.searchParams.set('mode', 'user');
+            const currentUrl = window.location.origin + window.location.pathname;
+            const studentUrl = currentUrl + "?mode=user";
+            
             document.getElementById('qrcode').innerHTML = '';
-            new QRCode(document.getElementById('qrcode'), { text: url.toString(), width: 180, height: 180 });
+            new QRCode(document.getElementById('qrcode'), { text: studentUrl, width: 180, height: 180 });
             document.getElementById('qrModal').classList.remove('hidden');
         }
         
         function hideQrModal() { document.getElementById('qrModal').classList.add('hidden'); }
-        
         function showMsg(m) { 
             const t = document.getElementById('toast'); 
-            t.textContent = m; 
-            t.style.opacity = "1"; 
+            t.textContent = m; t.style.opacity = "1"; 
             setTimeout(() => t.style.opacity = "0", 2500); 
         }
-
-        refreshAdminUI();
     </script>
 </body>
 </html>

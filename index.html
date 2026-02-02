@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授業振り返り・AI集計ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        .rating-card { transition: all 0.2s; cursor: pointer; border: 2px solid transparent; }
+        .rating-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
+        .tab-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background-color: #3b82f6; }
+        .ai-loading { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div class="max-w-2xl mx-auto p-4 md:p-8">
+        
+        <!-- タブ切り替え（生徒用モードでは非表示） -->
+        <div id="tabContainer" class="flex border-b border-slate-200 mb-8 bg-white rounded-t-xl shadow-sm overflow-hidden">
+            <button onclick="switchTab('user')" id="tab-user" class="tab-btn active relative flex-1 py-4 font-bold text-blue-600">回答する</button>
+            <button onclick="switchTab('admin')" id="tab-admin" class="tab-btn relative flex-1 py-4 font-bold text-slate-500">管理画面</button>
+        </div>
+
+        <!-- 【回答者用画面】 -->
+        <div id="view-user" class="space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold text-slate-800 mb-6 text-center">今日の学習の振り返り</h2>
+                
+                <div class="grid grid-cols-3 gap-4 mb-8">
+                    <div onclick="selectRating(3)" id="rate-3" class="rating-card bg-slate-50 p-4 rounded-xl text-center">
+                        <div class="text-4xl mb-2">😊</div>
+                        <div class="text-sm font-bold">バッチリ！</div>
+                    </div>
+                    <div onclick="selectRating(2)" id="rate-2" class="rating-card bg-slate-50 p-4 rounded-xl text-center">
+                        <div class="text-4xl mb-2">😐</div>
+                        <div class="text-sm font-bold">まあまあ</div>
+                    </div>
+                    <div onclick="selectRating(1)" id="rate-1" class="rating-card bg-slate-50 p-4 rounded-xl text-center">
+                        <div class="text-4xl mb-2">😕</div>
+                        <div class="text-sm font-bold">ちょっと不安</div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-slate-600">具体的によかったところや、質問を書いてね</label>
+                    <textarea id="userComment" placeholder="例：三角形の面積の出し方がわかった。公式を忘れないようにしたい。" 
+                        class="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"></textarea>
+                </div>
+
+                <button onclick="submitResponse()" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95">
+                    先生に送る
+                </button>
+            </div>
+        </div>
+
+        <!-- 【管理者用画面】 -->
+        <div id="view-admin" class="hidden space-y-6">
+            <div id="admin-content" class="space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
+                        <h3 class="text-xs text-slate-500">回答数</h3>
+                        <p id="stat-total" class="text-3xl font-bold text-blue-600">0</p>
+                    </div>
+                    <button onclick="showQrModal()" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center hover:bg-slate-50 transition-colors">
+                        <span class="text-2xl">📱</span>
+                        <p class="text-xs font-bold text-slate-600 mt-1">生徒用QRを表示</p>
+                    </button>
+                </div>
+
+                <!-- AI分析セクション -->
+                <div class="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 rounded-2xl shadow-xl text-white">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold">✨ 本格AI分析 (Gemini)</h3>
+                        <button onclick="runRealAiAnalysis()" id="aiBtn" class="bg-white text-indigo-700 px-4 py-1 rounded-full text-xs font-bold hover:bg-indigo-50 transition-all">
+                            分析を開始
+                        </button>
+                    </div>
+                    <div id="ai-result" class="text-sm leading-relaxed bg-black/10 p-4 rounded-xl border border-white/10 min-h-[100px]">
+                        「分析を開始」を押すと、AIが生徒の声を要約します。
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
+                    <h3 class="font-bold mb-4 text-slate-700">理解度の分布</h3>
+                    <div class="h-40"><canvas id="scoreChart"></canvas></div>
+                </div>
+
+                <div id="commentList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- QRモーダル -->
+        <div id="qrModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative">
+                <button onclick="hideQrModal()" class="absolute top-4 right-4 text-slate-400 p-2 text-xl">✕</button>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">回答用QRコード</h3>
+                <p class="text-xs text-slate-400 mb-6 font-bold">※生徒はこのQRから回答専用画面が開きます</p>
+                <div id="qrcode" class="flex justify-center mb-6 border-4 border-slate-100 p-2 rounded-xl inline-block mx-auto"></div>
+                <button onclick="copyStudentUrl()" class="text-blue-600 text-xs font-bold underline">生徒用URLをコピー</button>
+            </div>
+        </div>
+
+        <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl transition-all opacity-0 pointer-events-none transform translate-y-4"></div>
+    </div>
+
+    <script>
+        const apiKey = ""; 
+        let responses = [];
+        let selectedRate = 0;
+        let chartInstance = null;
+        let isUserMode = false;
+
+        // ページ読み込み時にモード判定
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('mode') === 'user') {
+                isUserMode = true;
+                document.getElementById('tabContainer').classList.add('hidden');
+                switchTab('user');
+            }
+        };
+
+        function switchTab(tab) {
+            if (isUserMode && tab === 'admin') return; // 生徒モード時は管理画面へ行けない
+            document.getElementById('view-user').classList.toggle('hidden', tab !== 'user');
+            document.getElementById('view-admin').classList.toggle('hidden', tab !== 'admin');
+            document.getElementById('tab-user').className = `tab-btn relative flex-1 py-4 font-bold ${tab === 'user' ? 'active text-blue-600' : 'text-slate-500'}`;
+            document.getElementById('tab-admin').className = `tab-btn relative flex-1 py-4 font-bold ${tab === 'admin' ? 'active text-blue-600' : 'text-slate-500'}`;
+            if (tab === 'admin') refreshAdminData();
+        }
+
+        function selectRating(val) {
+            selectedRate = val;
+            [1, 2, 3].forEach(v => document.getElementById(`rate-${v}`).className = `rating-card bg-slate-50 p-4 rounded-xl text-center border-2 ${v === val ? 'border-blue-500 bg-blue-50' : 'border-transparent'}`);
+        }
+
+        function submitResponse() {
+            const comment = document.getElementById('userComment').value.trim();
+            if (selectedRate === 0) return showToast("今の気持ちを選んでね");
+            responses.push({ rate: selectedRate, comment: comment || "無記入", time: new Date().toLocaleTimeString() });
+            selectedRate = 0;
+            document.getElementById('userComment').value = '';
+            document.querySelectorAll('.rating-card').forEach(el => el.className = "rating-card bg-slate-50 p-4 rounded-xl text-center border-2 border-transparent");
+            showToast("先生に送ったよ！ありがとう！");
+        }
+
+        function refreshAdminData() {
+            document.getElementById('stat-total').textContent = responses.length;
+            const list = document.getElementById('commentList');
+            list.innerHTML = responses.map(r => `
+                <div class="bg-white p-3 rounded-xl border border-slate-200 flex gap-3 text-sm">
+                    <span class="text-xl">${r.rate===3?'😊':r.rate===2?'😐':'😕'}</span>
+                    <div><p class="text-slate-700 font-medium">${r.comment}</p><p class="text-[10px] text-slate-400 mt-1">${r.time}</p></div>
+                </div>
+            `).reverse().join('');
+            updateChart();
+        }
+
+        function updateChart() {
+            const counts = [0, 0, 0];
+            responses.forEach(r => counts[r.rate - 1]++);
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['😕', '😐', '😊'],
+                    datasets: [{ data: counts, backgroundColor: ['#f87171', '#fbbf24', '#34d399'], borderRadius: 8 }]
+                },
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        }
+
+        async function runRealAiAnalysis() {
+            if (responses.length === 0) return showToast("回答がまだありません");
+            const btn = document.getElementById('aiBtn');
+            const resultDiv = document.getElementById('ai-result');
+            btn.disabled = true;
+            btn.textContent = "AI分析中...";
+            resultDiv.innerHTML = '<div class="ai-loading">回答を読み込んでいます...</div>';
+
+            const commentList = responses.map(r => `【評価:${r.rate}】 ${r.comment}`).join('\n');
+            const prompt = `あなたは教師のアシスタントです。以下の振り返りデータを分析し、1.全体のムード、2.具体的につまずいている点、3.明日へのアドバイスを簡潔に報告してください。\n\n${commentList}`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const result = await response.json();
+                resultDiv.innerHTML = (result.candidates?.[0]?.content?.parts?.[0]?.text || "分析に失敗しました。").replace(/\n/g, '<br>');
+            } catch (e) { resultDiv.innerHTML = "エラーが発生しました。"; }
+            btn.disabled = false;
+            btn.textContent = "分析を更新";
+        }
+
+        // 生徒用のURLを生成（?mode=userを付加）
+        function getStudentUrl() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('mode', 'user');
+            return url.toString();
+        }
+
+        function showQrModal() {
+            document.getElementById('qrcode').innerHTML = '';
+            new QRCode(document.getElementById('qrcode'), { 
+                text: getStudentUrl(), 
+                width: 200, 
+                height: 200,
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            document.getElementById('qrModal').classList.remove('hidden');
+        }
+
+        function hideQrModal() { document.getElementById('qrModal').classList.add('hidden'); }
+
+        function copyStudentUrl() {
+            navigator.clipboard.writeText(getStudentUrl());
+            showToast("生徒用URLをコピーしました");
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = "fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl transition-all opacity-100 transform translate-y-0 z-[100]";
+            setTimeout(() => t.className = "fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl transition-all opacity-0 transform translate-y-4", 3000);
+        }
+    </script>
+</body>
+</html>
+

@@ -54,7 +54,7 @@
                 <button onclick="showQrModal()" class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xl">📱</button>
             </div>
 
-            <!-- AI連携セクション（キー不要！） -->
+            <!-- AI連携セクション -->
             <div class="bg-indigo-600 p-5 rounded-2xl shadow-lg text-white">
                 <h3 class="font-bold flex items-center gap-2 text-sm mb-3">✨ 外部AIで分析する</h3>
                 <p class="text-[10px] mb-4 opacity-90">回答テキストをコピーして、ChatGPT等に貼り付けるだけで分析できます。</p>
@@ -76,14 +76,19 @@
 
         <!-- QR Modal -->
         <div id="qrModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 hidden">
-            <div class="bg-white rounded-3xl p-8 max-w-xs w-full text-center relative">
+            <div class="bg-white rounded-3xl p-8 max-w-xs w-full text-center relative shadow-2xl">
                 <button onclick="hideQrModal()" class="absolute top-4 right-4 text-slate-300">✕</button>
-                <div id="qrcode" class="flex justify-center mb-4 p-2 bg-white border rounded-xl"></div>
-                <p class="text-[10px] text-slate-400 font-bold">生徒はこのQRを読み取ってください</p>
+                <div id="qrcode" class="flex justify-center mb-6 p-2 bg-white border border-slate-100 rounded-2xl"></div>
+                <p class="text-[11px] text-slate-500 font-bold mb-4">生徒はこのQRを読み取ってください</p>
+                
+                <!-- 復活したコピーボタン -->
+                <button onclick="copyStudentUrl()" class="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 border border-blue-100">
+                    <span>🔗 生徒用URLをコピー</span>
+                </button>
             </div>
         </div>
 
-        <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full text-xs shadow-xl opacity-0 transition-all pointer-events-none"></div>
+        <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full text-xs shadow-xl opacity-0 transition-all pointer-events-none z-[100]"></div>
     </div>
 
     <script>
@@ -102,8 +107,9 @@
         function selectRating(val) {
             selectedRate = val;
             [1, 2, 3].forEach(v => {
-                document.getElementById(`rate-${v}`).style.borderColor = v === val ? '#3b82f6' : 'transparent';
-                document.getElementById(`rate-${v}`).style.backgroundColor = v === val ? '#eff6ff' : '#f8fafc';
+                const btn = document.getElementById(`rate-${v}`);
+                btn.style.borderColor = v === val ? '#3b82f6' : 'transparent';
+                btn.style.backgroundColor = v === val ? '#eff6ff' : '#f8fafc';
             });
         }
 
@@ -111,7 +117,12 @@
             const comment = document.getElementById('userComment').value.trim();
             if (selectedRate === 0) return showMsg("評価を選んでね");
             const now = new Date();
-            responses.push({ rate: selectedRate, comment: comment || "無記入", time: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`, ts: now.getTime() });
+            responses.push({ 
+                rate: selectedRate, 
+                comment: comment || "無記入", 
+                time: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`, 
+                ts: now.getTime() 
+            });
             localStorage.setItem('class_feedback_v3', JSON.stringify(responses));
             document.getElementById('userComment').value = '';
             showMsg("送信しました！");
@@ -149,35 +160,51 @@
             });
         }
 
-        // --- AI分析用コピー機能 ---
         function copyForAI() {
             if (responses.length === 0) return showMsg("回答がありません");
             const text = responses.map(r => `【評価:${r.rate}】${r.comment}`).join('\n');
             const prompt = `以下の授業振り返りデータを分析し、1.全体の傾向、2.つまずきポイント、3.次回へのアドバイスを簡潔にまとめてください。\n\n${text}`;
-            
-            const el = document.createElement('textarea');
-            el.value = prompt;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-            showMsg("コピーしました！AIに貼り付けてください");
-            
-            // ChatGPTやGeminiを開く案内（任意）
-            if(confirm("分析用テキストをコピーしました。ChatGPTまたはGeminiを開きますか？")) {
+            copyToClipboard(prompt, "コピーしました！AIに貼り付けてください");
+            if(confirm("分析用テキストをコピーしました。ChatGPTを開きますか？")) {
                 window.open("https://chatgpt.com/", "_blank");
             }
         }
 
+        function copyStudentUrl() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('mode', 'user');
+            copyToClipboard(url.toString(), "生徒用URLをコピーしました！");
+        }
+
+        function copyToClipboard(text, msg) {
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showMsg(msg);
+        }
+
         function clearData() { if (confirm("全消去しますか？")) { responses = []; localStorage.removeItem('class_feedback_v3'); refreshAdminUI(); } }
+        
         function showQrModal() {
-            const url = new URL(window.location.href); url.searchParams.set('mode', 'user');
+            const url = new URL(window.location.href); 
+            url.searchParams.set('mode', 'user');
             document.getElementById('qrcode').innerHTML = '';
             new QRCode(document.getElementById('qrcode'), { text: url.toString(), width: 180, height: 180 });
             document.getElementById('qrModal').classList.remove('hidden');
         }
+        
         function hideQrModal() { document.getElementById('qrModal').classList.add('hidden'); }
-        function showMsg(m) { const t = document.getElementById('toast'); t.textContent = m; t.style.opacity = "1"; setTimeout(() => t.style.opacity = "0", 2000); }
+        
+        function showMsg(m) { 
+            const t = document.getElementById('toast'); 
+            t.textContent = m; 
+            t.style.opacity = "1"; 
+            setTimeout(() => t.style.opacity = "0", 2500); 
+        }
+
         refreshAdminUI();
     </script>
 </body>

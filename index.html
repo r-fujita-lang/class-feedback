@@ -3,139 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>授業振り返り・AI分析</title>
+    <title>授業振り返り・AI集計</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
-        body { font-family: 'Noto Sans JP', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .rating-card { transition: all 0.2s; cursor: pointer; border: 2px solid transparent; }
-        .rating-card:active { transform: scale(0.95); }
+        body { font-family: 'Noto Sans JP', sans-serif; }
         .tab-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background-color: #3b82f6; }
-        .ai-glow { animation: glow 2s infinite ease-in-out; }
-        @keyframes glow { 0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.5); } 50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8); } }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen pb-20">
     <div class="max-w-md mx-auto p-4">
         
-        <!-- タブナビゲーション -->
         <div id="tabContainer" class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl shadow-sm overflow-hidden">
             <button onclick="switchTab('user')" id="tab-user" class="tab-btn active relative flex-1 py-4 font-bold text-blue-600 text-sm">回答する</button>
             <button onclick="switchTab('admin')" id="tab-admin" class="tab-btn relative flex-1 py-4 font-bold text-slate-500 text-sm">管理画面</button>
         </div>
 
-        <!-- 【1. 回答画面】 -->
+        <!-- 回答画面 -->
         <div id="view-user" class="space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold text-slate-800 mb-6 text-center">今日の振り返り</h2>
-                
+                <h2 class="text-lg font-bold text-slate-800 mb-6 text-center text-blue-700">授業の振り返り</h2>
                 <div class="grid grid-cols-3 gap-3 mb-6">
-                    <button onclick="selectRating(3)" id="rate-3" class="rating-card bg-slate-50 p-4 rounded-xl text-center shadow-sm border-2">
+                    <button onclick="selectRating(3)" id="rate-3" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50">
                         <div class="text-3xl mb-1">😊</div>
-                        <div class="text-[10px] font-bold text-slate-600">バッチリ</div>
+                        <div class="text-[10px] font-bold">バッチリ</div>
                     </button>
-                    <button onclick="selectRating(2)" id="rate-2" class="rating-card bg-slate-50 p-4 rounded-xl text-center shadow-sm border-2">
+                    <button onclick="selectRating(2)" id="rate-2" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50">
                         <div class="text-3xl mb-1">😐</div>
-                        <div class="text-[10px] font-bold text-slate-600">まあまあ</div>
+                        <div class="text-[10px] font-bold">まあまあ</div>
                     </button>
-                    <button onclick="selectRating(1)" id="rate-1" class="rating-card bg-slate-50 p-4 rounded-xl text-center shadow-sm border-2">
+                    <button onclick="selectRating(1)" id="rate-1" class="p-4 rounded-xl border-2 border-transparent bg-slate-50 hover:bg-blue-50">
                         <div class="text-3xl mb-1">😕</div>
-                        <div class="text-[10px] font-bold text-slate-600">不安</div>
+                        <div class="text-[10px] font-bold">不安</div>
                     </button>
                 </div>
-
-                <div class="space-y-2">
-                    <label class="block text-xs font-bold text-slate-500 uppercase">感想・質問</label>
-                    <textarea id="userComment" placeholder="学んだことや、わからなかったことを自由に書いてね" 
-                        class="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all"></textarea>
-                </div>
-
-                <button onclick="submitResponse()" id="submitBtn" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all">
-                    送信する
-                </button>
+                <textarea id="userComment" placeholder="わかったこと、難しかったことを書いてね" class="w-full h-32 bg-slate-50 border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                <button onclick="submitResponse()" class="w-full mt-6 bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all">送信する</button>
             </div>
         </div>
 
-        <!-- 【2. 管理画面】 -->
+        <!-- 管理画面 -->
         <div id="view-admin" class="hidden space-y-4">
-            <!-- 統計カード -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
-                    <h3 class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">合計回答数</h3>
-                    <p id="stat-total" class="text-3xl font-bold text-blue-600">0</p>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xs text-slate-500 font-bold">回答数</h3>
+                    <p id="stat-total" class="text-2xl font-bold text-blue-600">0</p>
                 </div>
-                <button onclick="showQrModal()" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center hover:bg-slate-50 transition-colors">
-                    <span class="text-2xl">📱</span>
-                    <p class="text-[10px] font-bold text-slate-600 mt-1">生徒用QR</p>
+                <button onclick="showQrModal()" class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xl">📱</button>
+            </div>
+
+            <!-- AI連携セクション（キー不要！） -->
+            <div class="bg-indigo-600 p-5 rounded-2xl shadow-lg text-white">
+                <h3 class="font-bold flex items-center gap-2 text-sm mb-3">✨ 外部AIで分析する</h3>
+                <p class="text-[10px] mb-4 opacity-90">回答テキストをコピーして、ChatGPT等に貼り付けるだけで分析できます。</p>
+                <button onclick="copyForAI()" class="w-full bg-white text-indigo-700 font-bold py-2 rounded-lg text-xs hover:bg-indigo-50 active:scale-95 transition-all">
+                    分析用テキストをコピー
                 </button>
             </div>
 
-            <!-- AI分析セクション -->
-            <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 p-5 rounded-2xl shadow-lg text-white ai-glow">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-bold flex items-center gap-2 text-sm">
-                        <span>✨</span> Gemini AI 分析
-                    </h3>
-                    <button onclick="runAiAnalysis()" id="aiBtn" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-[10px] font-bold transition-all border border-white/30">
-                        分析を実行
-                    </button>
-                </div>
-                <div id="ai-result" class="text-xs leading-relaxed bg-black/20 p-3 rounded-xl border border-white/10 min-h-[60px]">
-                    回答がたまるとAIが集計結果を要約します。
-                </div>
-            </div>
-
-            <!-- グラフ -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <div class="h-44"><canvas id="scoreChart"></canvas></div>
             </div>
 
-            <!-- コメント一覧 -->
-            <div class="flex justify-between items-center px-1 mt-6">
-                <h3 class="text-sm font-bold text-slate-700">回答詳細（新しい順）</h3>
-                <button onclick="clearData()" class="text-[10px] text-red-400 font-bold hover:underline">全消去</button>
+            <div class="flex justify-between items-center px-1">
+                <h3 class="text-sm font-bold text-slate-700">コメント一覧</h3>
+                <button onclick="clearData()" class="text-[10px] text-red-400">リセット</button>
             </div>
             <div id="commentList" class="space-y-3"></div>
         </div>
 
-        <!-- QRコードモーダル -->
+        <!-- QR Modal -->
         <div id="qrModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6 hidden">
-            <div class="bg-white rounded-3xl p-8 max-w-xs w-full text-center relative shadow-2xl">
-                <button onclick="hideQrModal()" class="absolute top-4 right-4 text-slate-300 text-xl font-light">✕</button>
-                <div id="qrcode" class="flex justify-center mb-4 p-2 bg-white border border-slate-100 rounded-2xl"></div>
-                <p class="text-[10px] text-slate-500 font-bold mb-4">生徒はこのQRを読み取ってください</p>
-                <button onclick="copyStudentUrl()" class="w-full py-2 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors">URLをコピー</button>
+            <div class="bg-white rounded-3xl p-8 max-w-xs w-full text-center relative">
+                <button onclick="hideQrModal()" class="absolute top-4 right-4 text-slate-300">✕</button>
+                <div id="qrcode" class="flex justify-center mb-4 p-2 bg-white border rounded-xl"></div>
+                <p class="text-[10px] text-slate-400 font-bold">生徒はこのQRを読み取ってください</p>
             </div>
         </div>
 
-        <!-- トースト通知 -->
-        <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full text-sm shadow-2xl opacity-0 transition-all pointer-events-none z-[100]"></div>
+        <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full text-xs shadow-xl opacity-0 transition-all pointer-events-none"></div>
     </div>
 
     <script>
-        // APIキー（必要に応じて設定）
-        const apiKey = ""; 
-
         let selectedRate = 0;
         let chartInstance = null;
-        let isUserMode = false;
-
-        // ローカルストレージからデータ取得
-        let responses = JSON.parse(localStorage.getItem('class_feedback_v2') || '[]');
-
-        window.onload = () => {
-            const params = new URLSearchParams(window.location.search);
-            if (params.get('mode') === 'user') {
-                isUserMode = true;
-                document.getElementById('tabContainer').classList.add('hidden');
-            }
-            refreshAdminUI();
-        };
+        let responses = JSON.parse(localStorage.getItem('class_feedback_v3') || '[]');
 
         function switchTab(tab) {
-            if (isUserMode && tab === 'admin') return;
             document.getElementById('view-user').classList.toggle('hidden', tab !== 'user');
             document.getElementById('view-admin').classList.toggle('hidden', tab !== 'admin');
             document.getElementById('tab-user').className = `tab-btn relative flex-1 py-4 font-bold ${tab === 'user' ? 'active text-blue-600' : 'text-slate-500'}`;
@@ -146,151 +102,83 @@
         function selectRating(val) {
             selectedRate = val;
             [1, 2, 3].forEach(v => {
-                const el = document.getElementById(`rate-${v}`);
-                el.className = `rating-card p-4 rounded-xl text-center shadow-sm border-2 ${v === val ? 'border-blue-500 bg-blue-50' : 'border-transparent bg-slate-50'}`;
+                document.getElementById(`rate-${v}`).style.borderColor = v === val ? '#3b82f6' : 'transparent';
+                document.getElementById(`rate-${v}`).style.backgroundColor = v === val ? '#eff6ff' : '#f8fafc';
             });
         }
 
         function submitResponse() {
             const comment = document.getElementById('userComment').value.trim();
-            if (selectedRate === 0) return showMsg("今の気持ちを選んでね");
-
-            // 送信時刻の取得
+            if (selectedRate === 0) return showMsg("評価を選んでね");
             const now = new Date();
-            const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-            // 保存
-            responses.push({ 
-                rate: selectedRate, 
-                comment: comment || "無記入", 
-                time: timeStr,
-                timestamp: now.getTime()
-            });
-            localStorage.setItem('class_feedback_v2', JSON.stringify(responses));
-
-            // UIリセット
-            selectedRate = 0;
+            responses.push({ rate: selectedRate, comment: comment || "無記入", time: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`, ts: now.getTime() });
+            localStorage.setItem('class_feedback_v3', JSON.stringify(responses));
             document.getElementById('userComment').value = '';
-            [1, 2, 3].forEach(v => document.getElementById(`rate-${v}`).className = "rating-card bg-slate-50 p-4 rounded-xl text-center shadow-sm border-2 border-transparent");
-            
-            showMsg("送信完了！");
+            showMsg("送信しました！");
             refreshAdminUI();
         }
 
         function refreshAdminUI() {
             document.getElementById('stat-total').textContent = responses.length;
             const list = document.getElementById('commentList');
-            const sorted = [...responses].sort((a, b) => b.timestamp - a.timestamp);
-
+            const sorted = [...responses].sort((a, b) => b.ts - a.ts);
             list.innerHTML = sorted.map(r => `
-                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-2xl">${r.rate===3?'😊':r.rate===2?'😐':'😕'}</span>
-                        <span class="text-[10px] font-bold text-slate-300 bg-slate-50 px-2 py-1 rounded-md">${r.time} 送信</span>
+                <div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex gap-3 items-start">
+                    <span class="text-xl">${r.rate===3?'😊':r.rate===2?'😐':'😕'}</span>
+                    <div class="flex-1">
+                        <div class="text-[9px] text-slate-300 font-bold mb-1">${r.time}</div>
+                        <p class="text-xs text-slate-600 font-medium">${r.comment}</p>
                     </div>
-                    <p class="text-sm text-slate-600 leading-relaxed font-medium">${r.comment}</p>
                 </div>
             `).join('');
-
             updateChart();
         }
 
         function updateChart() {
-            const canvas = document.getElementById('scoreChart');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
+            const ctx = document.getElementById('scoreChart').getContext('2d');
             const counts = [0, 0, 0];
             responses.forEach(r => counts[r.rate - 1]++);
-
             if (chartInstance) chartInstance.destroy();
             chartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['不安', 'まあまあ', 'バッチリ'],
-                    datasets: [{ 
-                        data: counts, 
-                        backgroundColor: ['#f87171', '#fbbf24', '#34d399'],
-                        borderRadius: 8,
-                        barThickness: 40
-                    }]
+                    labels: ['😕', '😐', '😊'],
+                    datasets: [{ data: counts, backgroundColor: ['#f87171', '#fbbf24', '#34d399'], borderRadius: 6 }]
                 },
-                options: { 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { borderDash: [5, 5] } },
-                        x: { ticks: { color: '#64748b', font: { weight: 'bold' } }, grid: { display: false } }
-                    } 
-                }
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
             });
         }
 
-        async function runAiAnalysis() {
-            if (responses.length === 0) return showMsg("データがありません");
-            if (!apiKey) {
-                document.getElementById('ai-result').innerHTML = "⚠️ APIキーが未設定です。コードの <code>apiKey</code> 部分を設定してください。";
-                return;
-            }
-
-            const btn = document.getElementById('aiBtn');
-            const resDiv = document.getElementById('ai-result');
-            btn.disabled = true;
-            resDiv.innerHTML = "AIが思考中...";
-
-            const text = responses.map(r => `評価:${r.rate}, 内容:${r.comment}`).join('\n');
-            const prompt = `以下の授業振り返りデータを分析して、100文字程度で要約してください。\n\n${text}`;
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                const result = await response.json();
-                resDiv.innerHTML = result.candidates[0].content.parts[0].text;
-            } catch (e) {
-                resDiv.innerHTML = "エラーが発生しました。時間をおいて試してください。";
-            } finally {
-                btn.disabled = false;
+        // --- AI分析用コピー機能 ---
+        function copyForAI() {
+            if (responses.length === 0) return showMsg("回答がありません");
+            const text = responses.map(r => `【評価:${r.rate}】${r.comment}`).join('\n');
+            const prompt = `以下の授業振り返りデータを分析し、1.全体の傾向、2.つまずきポイント、3.次回へのアドバイスを簡潔にまとめてください。\n\n${text}`;
+            
+            const el = document.createElement('textarea');
+            el.value = prompt;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showMsg("コピーしました！AIに貼り付けてください");
+            
+            // ChatGPTやGeminiを開く案内（任意）
+            if(confirm("分析用テキストをコピーしました。ChatGPTまたはGeminiを開きますか？")) {
+                window.open("https://chatgpt.com/", "_blank");
             }
         }
 
-        function clearData() {
-            if (confirm("すべての回答データを消去してもよろしいですか？")) {
-                responses = [];
-                localStorage.removeItem('class_feedback_v2');
-                refreshAdminUI();
-                showMsg("消去しました");
-            }
-        }
-
+        function clearData() { if (confirm("全消去しますか？")) { responses = []; localStorage.removeItem('class_feedback_v3'); refreshAdminUI(); } }
         function showQrModal() {
-            const url = new URL(window.location.href);
-            url.searchParams.set('mode', 'user');
+            const url = new URL(window.location.href); url.searchParams.set('mode', 'user');
             document.getElementById('qrcode').innerHTML = '';
             new QRCode(document.getElementById('qrcode'), { text: url.toString(), width: 180, height: 180 });
             document.getElementById('qrModal').classList.remove('hidden');
         }
-
         function hideQrModal() { document.getElementById('qrModal').classList.add('hidden'); }
-
-        function copyStudentUrl() {
-            const url = new URL(window.location.href);
-            url.searchParams.set('mode', 'user');
-            navigator.clipboard.writeText(url.toString());
-            showMsg("URLをコピーしました");
-        }
-
-        function showMsg(m) {
-            const t = document.getElementById('toast');
-            t.textContent = m;
-            t.style.opacity = "1";
-            t.style.transform = "translate(-50%, -10px)";
-            setTimeout(() => {
-                t.style.opacity = "0";
-                t.style.transform = "translate(-50%, 0px)";
-            }, 3000);
-        }
+        function showMsg(m) { const t = document.getElementById('toast'); t.textContent = m; t.style.opacity = "1"; setTimeout(() => t.style.opacity = "0", 2000); }
+        refreshAdminUI();
     </script>
 </body>
 </html>
